@@ -324,12 +324,6 @@ klip <- klip %>%
 # GGtheme
 ggthemr("fresh")
 
-#-------------------Crosstab (can't include `SECTION1.HouseHoldMembers.Q104` for some reason)--------------------
-tab <- tabmulti(`SECTION1.HouseHoldMembers.HHGender` + `SECTION1.HouseHoldMembers.Q103a` + `SECTION1.HouseHoldMembers.Q106` +`SECTION1.HouseHoldMembers.MaritalStatus` + `SECTION1.HouseHoldMembers.Q106` +
-                  SECTION2HOUSEHOLDCHARACTERISTICS.Q213b + `Section5.Q501b` + SECTION2HOUSEHOLDCHARACTERISTICS.cattleownedsep18 + SECTION2HOUSEHOLDCHARACTERISTICS.Q205a ~ treat, data = klip)
-tabh <- as_hux(tab)
-quick_html(theme_article(tabh), file = "Tables/klipxtab.html")
-quick_docx(theme_article(tabh), file = "Tables/klipxtab.docx")
 
 #-------------------Comparison of socio-economic groups---------------------------------------
 
@@ -575,27 +569,6 @@ edu_comb <- grid.arrange(combeducou, combeducounont, nrow = 2)
 
 ggsave("Plots/combeducou.pdf", edu_comb, width = 10, height = 10)
 
-#-----------------------Payout year by County--------------------------------------------------
-
-payoutyr <- klip2 %>%
-  dplyr::rename(
-    "2015" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a2, "2016" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a4,
-    "2017" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a6, "2018" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a8,
-    "2019" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a10
-  ) %>%
-  group_by(County) %>%
-  dplyr::select("2015", "2016", "2017", "2018", "2019") %>%
-  summarise_if(is.numeric, mean, na.rm = T) %>%
-  gather(key, value, -County) %>%
-  mutate(key = as.numeric(key)) %>%
-  ggplot(aes(key, value, color = County)) +
-  geom_point() +
-  geom_smooth(method = "loess", se = T) +
-  facet_wrap(~County) +
-  theme_fivethirtyeight() +
-  ggtitle("KLIP payout per year")
-
-ggsave("Plots/payoutyr.pdf", payoutyr, width = 6, height = 6)
 
 #-------------------------Cattlegain/loss-------------------------------------
 
@@ -1142,328 +1115,6 @@ cattleplot <- plot_model(
 
 ggsave("Plots/cattleplot.pdf", cattleplot, width = 13, height = 10)
 
-#--------------Beneficiaries are better off -------------------------------
-dchar <- function(grouping, varia) {
-  myaexp <- klip2 %>%
-    dplyr::select(grouping, varia)
-  
-  # myaexp <- subset(myaexp, myaexp[[varia]] !=c("No Response "))
-  # myaexp[[varia]] <- droplevels(myaexp[[varia]])
-  
-  myaexp <- subset(myaexp, myaexp[[varia]] != c("Do Not Know"))
-  myaexp[[varia]] <- droplevels(myaexp[[varia]])
-  
-  mdfr <- reshape::melt(myaexp, id.vars = grouping)
-  a <- data.frame(prop.table(table(mdfr[[grouping]], mdfr$value), 1) * 100)
-  
-  neg <- a %>%
-    filter(Var2 %in% levels(Var2)[1:3]) %>%
-    mutate(Freq = case_when(
-      Var2 == "Neutral" ~ Freq / 2,
-      TRUE ~ Freq
-    ))
-  
-  pos <- a %>%
-    filter(Var2 %in% levels(Var2)[3:5]) %>%
-    mutate(
-      Freq = case_when(
-        Var2 == "Neutral" ~ Freq / 2,
-        TRUE ~ Freq
-      ),
-      Var2 = factor(Var2, levels = rev(levels(Var2)))
-    )
-  
-  plot <- ggplot() +
-    geom_col(
-      data = pos,
-      aes(
-        x = Var1,
-        y = Freq,
-        fill = Var2
-      )
-    ) +
-    geom_col(
-      data = neg,
-      aes(
-        x = Var1,
-        y = -Freq,
-        fill = Var2
-      )
-    ) +
-    coord_flip() +
-    theme_fivethirtyeight() +
-    scale_fill_brewer(
-      name = "",
-      limits = levels(neg$Var2),
-      labels = levels(neg$Var2),
-      palette = "RdBu"
-    ) +
-    theme(
-      legend.position = "none",
-      plot.title = element_text(
-        size = 14,
-        face = "bold"
-      )
-    ) +
-    ylim(-30, 100)
-}
-
-one <- dchar("County", "SECTION2HOUSEHOLDCHARACTERISTICS.Q211c") +
-  ggtitle("KLIP beneficiaries are much better off than those not registered in KLIP")
-
-ggsave("Plots/beneficiary_better.pdf", one, width = 9, height = 6)
-
-#---------Reason for animal loss --------------------
-dchar <- function(grouping, varia) {
-  myaexp <- klip %>%
-    dplyr::select(grouping, varia)
-  # myaexp <- subset(myaexp, myaexp[[varia]] !=c("No Response "))
-  # myaexp[[varia]] <- droplevels(myaexp[[varia]])
-  myaexp <- subset(myaexp, myaexp[[varia]] != c("Do Not Know"))
-  myaexp[[varia]] <- droplevels(myaexp[[varia]])
-  mdfr <- reshape::melt(myaexp, id.vars = grouping)
-  a <- data.frame(prop.table(table(mdfr[[grouping]], mdfr$value), 1) * 100)
-  neg <- a %>%
-    filter(Var2 %in% levels(Var2)[1:3]) %>%
-    mutate(Freq = case_when(
-      Var2 == "Neutral" ~ Freq / 2,
-      TRUE ~ Freq
-    ))
-  pos <- a %>%
-    filter(Var2 %in% levels(Var2)[3:5]) %>%
-    mutate(
-      Freq = case_when(
-        Var2 == "Neutral" ~ Freq / 2,
-        TRUE ~ Freq
-      ),
-      Var2 = factor(Var2, levels = rev(levels(Var2)))
-    )
-  plot <- ggplot() +
-    geom_col(data = pos, aes(
-      x = Var1,
-      y = Freq,
-      fill = Var2
-    )) +
-    geom_col(data = neg, aes(
-      x = Var1,
-      y = -Freq,
-      fill = Var2
-    )) +
-    coord_flip() +
-    theme_fivethirtyeight() +
-    scale_fill_brewer(name = "", limits = levels(neg$Var2), labels = levels(neg$Var2), palette = "RdBu") +
-    theme(
-      legend.position = "none",
-      plot.title = element_text(
-        size = 11,
-        face = "bold"
-      )
-    ) +
-    ylim(-100, 20)
-}
-
-one <- dchar("treat", "SECTION2HOUSEHOLDCHARACTERISTICS.Q206a") + 
-  ggtitle("Have KLIP payouts affected the numbers of livestock traded at local market?") + 
-  theme(legend.position = "bottom")
-
-#------- Understand how KLIP works -----------------
-dchar <- function(grouping, varia) {
-  myaexp <- klip2 %>%
-    dplyr::select(grouping, varia)
-  
-  # myaexp <- subset(myaexp, myaexp[[varia]] !=c("No Response "))
-  # myaexp[[varia]] <- droplevels(myaexp[[varia]])
-  
-  myaexp <- subset(myaexp, myaexp[[varia]] != c("Do Not Know"))
-  myaexp[[varia]] <- droplevels(myaexp[[varia]])
-  
-  mdfr <- reshape::melt(myaexp, id.vars = grouping)
-  a <- data.frame(prop.table(table(mdfr[[grouping]], mdfr$value), 1) * 100)
-  
-  neg <- a %>%
-    filter(Var2 %in% levels(Var2)[1:3]) %>%
-    mutate(Freq = case_when(
-      Var2 == "Neutral" ~ Freq / 2,
-      TRUE ~ Freq
-    ))
-  
-  pos <- a %>%
-    filter(Var2 %in% levels(Var2)[3:5]) %>%
-    mutate(
-      Freq = case_when(
-        Var2 == "Neutral" ~ Freq / 2,
-        TRUE ~ Freq
-      ),
-      Var2 = factor(Var2, levels = rev(levels(Var2)))
-    )
-  
-  plot <- ggplot() +
-    geom_col(
-      data = pos,
-      aes(
-        x = Var1,
-        y = Freq,
-        fill = Var2
-      )
-    ) +
-    geom_col(
-      data = neg,
-      aes(
-        x = Var1,
-        y = -Freq,
-        fill = Var2
-      )
-    ) +
-    coord_flip() +
-    theme_fivethirtyeight() +
-    scale_fill_brewer(
-      name = "",
-      limits = levels(neg$Var2),
-      labels = levels(neg$Var2),
-      palette = "RdBu"
-    ) +
-    theme(
-      legend.position = "none",
-      plot.title = element_text(
-        size = 14,
-        face = "bold"
-      )
-    ) +
-    ylim(-100, 100)
-}
-
-one <- dchar("County", "SECTION3Localmarketperception.Q303g") +
-  ggtitle("All pastoralists understand how KLIP works")
-
-two <- dchar("County", "SECTION3Localmarketperception.Q303h") +
-  ggtitle("Most pastoralists do not even know if they're registered for KLIP")
-
-three <- dchar("County", "SECTION3Localmarketperception.Q304j") +
-  ggtitle("I am aware of exactly when I will be recieving a KLIP payout")
-
-market <- grid.arrange(one, two, three, ncol = 1)
-
-ggsave("Plots/market.pdf", market, width = 12, height = 10)
-
-#------------ Insurance products -----------------
-# Gender difference heard of Klip before
-barch <- function(data, cat, ans) {
-  myaexp <- data %>%
-    dplyr::select(cat, ans)
-  
-  myaexp <- subset(myaexp, myaexp[[ans]] != c("No response"))
-  myaexp[[ans]] <- droplevels(myaexp[[ans]])
-  
-  # myaexp <- subset(myaexp, myaexp[[ans]] !=c("Do Not Know"))
-  # myaexp[[ans]] <- droplevels(myaexp[[ans]])
-  
-  mdfr <- reshape::melt(myaexp, id.vars = cat)
-  
-  a <- data.frame(prop.table(table(mdfr[[cat]], mdfr$value), 1) * 100)
-  
-  chplot <- ggplot( a, aes(x = Var1,
-                           y = Freq,
-                           fill = forcats::fct_rev(Var2)))  +
-    labs(x = "", y = "Pecentage") +
-    scale_fill_manual(values=c("#1372a4", "#e57137")) +
-    geom_bar(stat = "identity") +
-    theme_538() +
-    theme(
-      legend.position = "bottom",
-      plot.title = element_text(
-        size = 20,
-        family = "",
-        color = "Black",
-        face = "bold",
-        hjust = 0.5
-      ),
-      legend.text = element_text(size = 16),
-      axis.text = element_text(
-        size = 16,
-        family = "",
-        color = "Black",
-        hjust = 0
-      ),
-      axis.title = element_text(
-        size = 18,
-        family = "",
-        color = "Black",
-        face = "bold",
-        hjust = 0.5
-      )
-    ) +
-    coord_flip() +
-    guides(fill = guide_legend(reverse = TRUE))
-  chplot
-}
-
-dat <- klip %>%
-  filter(Section5.Q501b != "Don't know") %>%
-  mutate(Section5.Q501b = droplevels(Section5.Q501b))
-
-one <- barch( dat, "treat", "SECTION2HOUSEHOLDCHARACTERISTICS.Q201a") +
-  xlab("") +
-  ggtitle("Have you ever heard of KLIP?")  +
-  theme(legend.position = "none") 
-
-two <- barch( dat, "SECTION1.HouseHoldMembers.HHGender", "SECTION2HOUSEHOLDCHARACTERISTICS.Q201a") +
-  xlab("") +
-  ggtitle("Have you ever heard of KLIP?")  +
-  theme(legend.position = "none") 
-
-three <- barch( dat, "County", "SECTION2HOUSEHOLDCHARACTERISTICS.Q201a") +
-  xlab("") +
-  ggtitle("Have you ever heard of KLIP?") + 
-  theme(legend.title = element_blank())
-
-comb <- cowplot::plot_grid(one,two,three, ncol=1, align = "vh") 
-
-ggsave("Plots/comb_insu.pdf", comb, width = 10, height = 12)
-
-# Drought experience PLots
-treat_plot <- lapply(levels(klip$treat), function(yy){
-  klip <- klip %>% filter(treat == yy)
-  
-  county_prop <- lapply(levels(klip$County), function(tt) {
-    klip <- klip %>% filter(County == tt)
-    
-    prop <- unlist(
-      lapply(
-        colnames(klip %>% select(contains("SECTION2HOUSEHOLDCHARACTERISTICS.Q212"))), function(cc){
-          table(klip %>% select(cc))[1] / count(klip %>% select(cc)) 
-        }
-      )
-    )
-    
-    prop <- as.data.frame(prop)
-    prop$date <- 2009:2019
-    return(prop)
-  })
-  
-  one <- ggplot(county_prop[[1]], aes(date, prop)) + geom_point(size = 3)  +
-    theme_fivethirtyeight() + ggtitle(levels(klip$County)[1]) + geom_smooth(method= "loess") + ylim(0.2, 1) +
-    scale_x_continuous(breaks=c(2009,2019)) + ylab(levels(klip$treat)[levels(klip$treat)==yy])
-  
-  two <-  ggplot(county_prop[[2]], aes(date, prop)) + geom_point(size = 3)  +
-    theme_fivethirtyeight() + ggtitle(levels(klip$County)[2]) + geom_smooth(method= "loess") + ylim(0.2, 1) +
-    scale_x_continuous(breaks=c(2009,2019))
-  
-  
-  three <- ggplot(county_prop[[3]], aes(date, prop)) + geom_point(size = 3)  +
-    theme_fivethirtyeight() + ggtitle(levels(klip$County)[3]) + geom_smooth(method= "loess") + ylim(0.2, 1) +
-    scale_x_continuous(breaks=c(2009,2019))
-  
-  four <-  ggplot(county_prop[[4]], aes(date, prop)) + geom_point(size = 3)  +
-    theme_fivethirtyeight() + ggtitle(levels(klip$County)[4]) + geom_smooth(method= "loess") + ylim(0.2, 1) +
-    scale_x_continuous(breaks=c(2009,2019))
-  
-  return(grid.arrange(one,two,three,four, nrow=1))
-})
-
-drought_yr <- grid.arrange(treat_plot[[1]], treat_plot[[2]], nrow=2)
-
-ggsave("Plots/drought_yr.pdf",  drought_yr, width = 10, height = 6)
-
 #---------------------- Plots for Perception of Quality of Index-------------------------------------------
 dchar <- function(grouping, varia) {
   myaexp <- tt %>%
@@ -1530,27 +1181,112 @@ graphy <- dchar("two", "one") +
 
 ggsave("Plots/graphy.pdf",  graphy, width = 10, height = 4)
 
+#--------------------------Understanding-------------------------------------------
+#Graph 1
+dchar_und <- function(grouping, varia) {
+  myaexp <- tt %>%
+    dplyr::select(grouping, varia)
+  # myaexp <- subset(myaexp, myaexp[[varia]] !=c("No Response "))
+  # myaexp[[varia]] <- droplevels(myaexp[[varia]])
+  myaexp <- subset(myaexp, myaexp[[varia]] != c("Do Not Know"))
+  myaexp[[varia]] <- droplevels(myaexp[[varia]])
+  mdfr <- reshape::melt(myaexp, id.vars = grouping)
+  a <- data.frame(prop.table(table(mdfr[[grouping]], mdfr$value), 1) * 100)
+  neg <- a %>%
+    filter(Var2 %in% levels(Var2)[1:3]) %>%
+    mutate(Freq = case_when(
+      Var2 == "Neutral" ~ Freq / 2,
+      TRUE ~ Freq
+    ))
+  pos <- a %>%
+    filter(Var2 %in% levels(Var2)[3:5]) %>%
+    mutate(Freq = case_when(
+      Var2 == "Neutral" ~ Freq / 2,
+      TRUE ~ Freq),
+      Var2 = factor(Var2, levels = rev(levels(Var2))))
+  plot <- ggplot() +
+    geom_col(
+      data = pos,
+      aes(x = Var1,
+          y = Freq,
+          fill = Var2)
+    ) +
+    geom_col(
+      data = neg,
+      aes(x = Var1,
+          y = -Freq,
+          fill = Var2)
+    ) +
+    coord_flip() +
+    theme_fivethirtyeight() +
+    scale_fill_brewer(
+      name = "",
+      limits = levels(neg$Var2),
+      labels = levels(neg$Var2),
+      palette = "RdBu"
+    ) +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(size = 11, face = "bold")
+    ) +
+    ylim(-100, 100)
+}
+
 # Registration process
-testone <- klip2 %>% select(SECTION3Localmarketperception.Q304) %>% mutate(one = "There were some registration criteria that I did not completely understand")
-testtwo <- klip2 %>% select(SECTION3Localmarketperception.Q304k) %>% mutate(one = "The registration process for KLIP should be improved")
-testthree <-klip2 %>% select(SECTION3Localmarketperception.Q304j) %>% mutate(one = "I am aware of exactly when I should receive a payout or not")
-  
+testone <- klip2 %>% 
+  select(SECTION3Localmarketperception.Q304) %>%
+  mutate(one = "There were some registration criteria that I did not completely understand")
+testtwo <- klip2 %>%
+  select(SECTION3Localmarketperception.Q303h) %>%
+  mutate(one = "Most pastoralists do not even know if they're registered for KLIP")
+testthree <- klip2 %>%
+  select(SECTION3Localmarketperception.Q303g) %>%
+  mutate(one = "All pastoralists understand how KLIP works")
+
 colnames(testone) <- "one"
 colnames(testtwo) <- "one"
 colnames(testthree) <- "one"
 tt <- rbind(testone, testtwo, testthree)
 colnames(tt) <- c("one", "two")
 
-graphy2 <- dchar("two", "one") + 
+graphy2 <- dchar_und("two", "one") + 
   scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
-  ylim(-80, 90) + 
+  ylim(-70, 70) + 
   theme(axis.text.y = element_text(face = "bold", size = 12),
         axis.text.x = element_text(size = 12),
         legend.position = "bottom")
 
 ggsave("Plots/graphy2.pdf",  graphy2, width = 10, height = 4)
 
-# Registration process
+#-------------------Graph 2------------------------------
+testone <- klip2 %>% 
+  select(SECTION3Localmarketperception.Q304j) %>% 
+  mutate(one = "I am aware of exactly when I should receive a payout or not")
+testtwo <- klip2 %>% 
+  select(SECTION3Localmarketperception.Q304k) %>% 
+  mutate(one = "The registration process for KLIP should be improved")
+testthree <- klip2 %>% 
+  select(SECTION2HOUSEHOLDCHARACTERISTICS.Q202eii) %>% 
+  mutate(one = "Communication/Feedback on KLIP related matters from the provider is regular")
+
+colnames(testone) <- "one"
+colnames(testtwo) <- "one"
+colnames(testthree) <- "one"
+tt <- rbind(testone, testtwo, testthree)
+colnames(tt) <- c("one", "two")
+
+graphy <- dchar_und("two", "one") +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
+  ylim(-80, 90) +
+  theme(
+    axis.text.y = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(size = 12),
+    legend.position = "bottom"
+  )
+
+ggsave("Plots/understanding.pdf", graphy, width = 7, height = 4)
+
+#-----------------------Registration process-------------------------
 testone <- klip2 %>% select(SECTION3Localmarketperception.Q304) %>% mutate(one = "I had difficulty accessing the payout at the bank")
 testtwo <- klip2 %>% select(SECTION3Localmarketperception.Q304k) %>% mutate(one = "The Insurance payouts I have received were the amounts I expected")
 testthree <- klip2 %>% select(Section7FinancialServices.Q706iii) %>% mutate(one = "Using mobile phone to access KLIP Insurance payouts is better than the Bank ")
@@ -1569,6 +1305,8 @@ graphy3 <- dchar("two", "one") +
         legend.position = "bottom")
 
 ggsave("Plots/graphy3.pdf",  graphy3, width = 10, height = 4)
+
+#----------------Registration process----------------------------------
 
 # Method of payment
 dcharg <- function(grouping, varia) {
@@ -1704,6 +1442,76 @@ combinetime <- grid.arrange(one, two, ncol = 2)
 
 ggsave("Plots/combinetime.pdf", combinetime, width = 13.5, height = 5)
 
+#------------------KLIP Impacts
+# Registration process
+testone <- klip2 %>% select(SECTION8HUMANITAIRANASSISTANCE.Q808) %>% mutate(one = "With KLIP you can be certain that they will issue Payout when there is severe drought")
+testtwo <- klip2 %>% select(SECTION8HUMANITAIRANASSISTANCE.Q811) %>% mutate(one = " KLIP payout is always sufficient to help with our livestock during draught or short rains")
+
+colnames(testone) <- "one"
+colnames(testtwo) <- "one"
+tt <- rbind(testone, testtwo)
+colnames(tt) <- c("one", "two")
+
+graph_impact <- dchar("two", "one") + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
+  ylim(-40, 90) + 
+  theme(axis.text.y = element_text(face = "bold", size = 12),
+        axis.text.x = element_text(size = 12),
+        legend.position = "bottom")
+
+ggsave("Plots/graphy_impact.pdf",  graph_impact, width = 10, height = 4)
+
+#-------------------Crosstab (can't include `SECTION1.HouseHoldMembers.Q104` for some reason)--------------------
+tab <- tabmulti(`SECTION1.HouseHoldMembers.HHGender` + `SECTION1.HouseHoldMembers.Q103a` + `SECTION1.HouseHoldMembers.Q106` +`SECTION1.HouseHoldMembers.MaritalStatus` + `SECTION1.HouseHoldMembers.Q106` +
+                  SECTION2HOUSEHOLDCHARACTERISTICS.Q213b + `Section5.Q501b` + SECTION2HOUSEHOLDCHARACTERISTICS.cattleownedsep18 + SECTION2HOUSEHOLDCHARACTERISTICS.Q205a ~ treat, data = klip)
+tabh <- as_hux(tab)
+quick_html(theme_article(tabh), file = "Tables/klipxtab.html")
+quick_docx(theme_article(tabh), file = "Tables/klipxtab.docx")
+
+#----------------Drought experience Plots----------------------------------------------------------------
+treat_plot <- lapply(levels(klip$treat), function(yy){
+  klip <- klip %>% filter(treat == yy)
+  
+  county_prop <- lapply(levels(klip$County), function(tt) {
+    klip <- klip %>% filter(County == tt)
+    
+    prop <- unlist(
+      lapply(
+        colnames(klip %>% select(contains("SECTION2HOUSEHOLDCHARACTERISTICS.Q212"))), function(cc){
+          table(klip %>% select(cc))[1] / count(klip %>% select(cc)) 
+        }
+      )
+    )
+    
+    prop <- as.data.frame(prop)
+    prop$date <- 2009:2019
+    return(prop)
+  })
+  
+  one <- ggplot(county_prop[[1]], aes(date, prop)) + geom_point(size = 3)  +
+    theme_fivethirtyeight() + ggtitle(levels(klip$County)[1]) + geom_smooth(method= "loess") + ylim(0.2, 1) +
+    scale_x_continuous(breaks=c(2009,2019)) + ylab(levels(klip$treat)[levels(klip$treat)==yy])
+  
+  two <-  ggplot(county_prop[[2]], aes(date, prop)) + geom_point(size = 3)  +
+    theme_fivethirtyeight() + ggtitle(levels(klip$County)[2]) + geom_smooth(method= "loess") + ylim(0.2, 1) +
+    scale_x_continuous(breaks=c(2009,2019))
+  
+  
+  three <- ggplot(county_prop[[3]], aes(date, prop)) + geom_point(size = 3)  +
+    theme_fivethirtyeight() + ggtitle(levels(klip$County)[3]) + geom_smooth(method= "loess") + ylim(0.2, 1) +
+    scale_x_continuous(breaks=c(2009,2019))
+  
+  four <-  ggplot(county_prop[[4]], aes(date, prop)) + geom_point(size = 3)  +
+    theme_fivethirtyeight() + ggtitle(levels(klip$County)[4]) + geom_smooth(method= "loess") + ylim(0.2, 1) +
+    scale_x_continuous(breaks=c(2009,2019))
+  
+  return(grid.arrange(one,two,three,four, nrow=1))
+})
+
+drought_yr <- grid.arrange(treat_plot[[1]], treat_plot[[2]], nrow=2)
+
+ggsave("Plots/drought_yr.pdf",  drought_yr, width = 10, height = 6)
+
 #========================Type of payout ===================================================
 type_payout <- klip2 %>% 
   group_by(County, SECTION2HOUSEHOLDCHARACTERISTICS.Q201f) %>%  
@@ -1747,6 +1555,37 @@ receive_payout <- klip2 %>%
 ggsave("Plots/receive_payout.pdf", receive_payout, width = 9, height = 6)
 ggsave("Plots/type_payout.pdf", type_payout, width = 11, height = 9)
 
+#-----------------------Payout year by County--------------------------------------------------
+payoutyr <- klip2 %>%
+  dplyr::rename(
+    "2015" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a2, "2016" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a4,
+    "2017" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a6, "2018" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a8,
+    "2019" = SECTION2HOUSEHOLDCHARACTERISTICS.Q202a10
+  ) %>%
+  group_by(County) %>%
+  dplyr::select("2015", "2016", "2017", "2018", "2019") %>%
+  summarise_if(is.numeric, mean, na.rm = T) %>%
+  gather(key, value, -County) %>%
+  mutate(key = as.numeric(key)) %>%
+  ggplot(aes(key, value, color = County)) +
+  geom_point(aes(size = 1.5)) +
+  geom_smooth(method = "loess", se = T) +
+  facet_wrap(~County) +
+  theme_fivethirtyeight() +
+  ggtitle("") +
+  theme(
+    strip.text = element_text(size = 16),
+    legend.position = "none",
+    axis.title = element_text(size = 16,
+                              face = "bold"),
+    panel.spacing = unit(2, "lines")
+  ) +
+  ylab('Value (Ksh)') +
+  xlab("Year") +
+  scale_x_continuous(breaks=c(2015,2019)) 
+
+ggsave("Plots/payoutyr.pdf", payoutyr, width = 6, height = 6)
+
 #-------------------------------------Regression--------------------------------------------
 klip_lm <- klip %>%
   remove_all_labels() %>%
@@ -1779,129 +1618,7 @@ payplot <- plot_model(paylm,
 
 ggsave("Plots/payplot.pdf", payplot, width = 10, height = 6)
 
-#--------------------------Understanding-------------------------------------------
-#Graph 1
-dchar_und <- function(grouping, varia) {
-  myaexp <- tt %>%
-    dplyr::select(grouping, varia)
-  # myaexp <- subset(myaexp, myaexp[[varia]] !=c("No Response "))
-  # myaexp[[varia]] <- droplevels(myaexp[[varia]])
-  myaexp <- subset(myaexp, myaexp[[varia]] != c("Do Not Know"))
-  myaexp[[varia]] <- droplevels(myaexp[[varia]])
-  mdfr <- reshape::melt(myaexp, id.vars = grouping)
-  a <- data.frame(prop.table(table(mdfr[[grouping]], mdfr$value), 1) * 100)
-  neg <- a %>%
-    filter(Var2 %in% levels(Var2)[1:3]) %>%
-    mutate(Freq = case_when(
-      Var2 == "Neutral" ~ Freq / 2,
-      TRUE ~ Freq
-    ))
-  pos <- a %>%
-    filter(Var2 %in% levels(Var2)[3:5]) %>%
-    mutate(Freq = case_when(
-      Var2 == "Neutral" ~ Freq / 2,
-      TRUE ~ Freq),
-      Var2 = factor(Var2, levels = rev(levels(Var2))))
-  plot <- ggplot() +
-    geom_col(
-      data = pos,
-      aes(x = Var1,
-          y = Freq,
-          fill = Var2)
-    ) +
-    geom_col(
-      data = neg,
-      aes(x = Var1,
-          y = -Freq,
-          fill = Var2)
-    ) +
-    coord_flip() +
-    theme_fivethirtyeight() +
-    scale_fill_brewer(
-      name = "",
-      limits = levels(neg$Var2),
-      labels = levels(neg$Var2),
-      palette = "RdBu"
-    ) +
-    theme(
-      legend.position = "none",
-      plot.title = element_text(size = 11, face = "bold")
-    ) +
-    ylim(-100, 100)
-}
 
-# Registration process
-testone <- klip2 %>% 
-  select(SECTION3Localmarketperception.Q304) %>%
-  mutate(one = "There were some registration criteria that I did not completely understand")
-testtwo <- klip2 %>%
-  select(SECTION3Localmarketperception.Q303h) %>%
-  mutate(one = "Most pastoralists do not even know if they're registered for KLIP")
-testthree <- klip2 %>%
-  select(SECTION3Localmarketperception.Q303g) %>%
-  mutate(one = "All pastoralists understand how KLIP works")
-
-colnames(testone) <- "one"
-colnames(testtwo) <- "one"
-colnames(testthree) <- "one"
-tt <- rbind(testone, testtwo, testthree)
-colnames(tt) <- c("one", "two")
-
-graphy2 <- dchar_und("two", "one") + 
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
-  ylim(-70, 70) + 
-  theme(axis.text.y = element_text(face = "bold", size = 12),
-        axis.text.x = element_text(size = 12),
-        legend.position = "bottom")
-
-ggsave("Plots/graphy2.pdf",  graphy2, width = 10, height = 4)
-
-# Graph 2
-testone <- klip2 %>% 
-  select(SECTION3Localmarketperception.Q304j) %>% 
-  mutate(one = "I am aware of exactly when I should receive a payout or not")
-testtwo <- klip2 %>% 
-  select(SECTION3Localmarketperception.Q304k) %>% 
-  mutate(one = "The registration process for KLIP should be improved")
-testthree <- klip2 %>% 
-  select(SECTION2HOUSEHOLDCHARACTERISTICS.Q202eii) %>% 
-  mutate(one = "Communication/Feedback on KLIP related matters from the provider is regular")
-
-colnames(testone) <- "one"
-colnames(testtwo) <- "one"
-colnames(testthree) <- "one"
-tt <- rbind(testone, testtwo, testthree)
-colnames(tt) <- c("one", "two")
-
-graphy <- dchar_und("two", "one") +
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
-  ylim(-80, 90) +
-  theme(
-    axis.text.y = element_text(face = "bold", size = 12),
-    axis.text.x = element_text(size = 12),
-    legend.position = "bottom"
-  )
-
-ggsave("Plots/understanding.pdf", graphy, width = 7, height = 4)
-
-#------------------KLIP Impacts
-# Registration process
-testone <- klip2 %>% select(SECTION8HUMANITAIRANASSISTANCE.Q808) %>% mutate(one = "With KLIP you can be certain that they will issue Payout when there is severe drought")
-testtwo <- klip2 %>% select(SECTION8HUMANITAIRANASSISTANCE.Q811) %>% mutate(one = " KLIP payout is always sufficient to help with our livestock during draught or short rains")
-
-colnames(testone) <- "one"
-colnames(testtwo) <- "one"
-tt <- rbind(testone, testtwo)
-colnames(tt) <- c("one", "two")
-
-graph_impact <- dchar("two", "one") + 
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
-  ylim(-40, 90) + 
-  theme(axis.text.y = element_text(face = "bold", size = 12),
-        axis.text.x = element_text(size = 12),
-        legend.position = "bottom")
-
-ggsave("Plots/graphy_impact.pdf",  graph_impact, width = 10, height = 4)
 
 #-----------------Agree that KLIP payouts are helpful-------------------------------------------
 barch <- function(data_source, grouping, varia) {
@@ -2201,3 +1918,304 @@ impact_compare <- dchar("two", "one") +
 
 ggsave("Plots/impact_compare.pdf",  impact_compare, width = 10, height = 4)
 
+
+
+#--------Extra---------------
+#--------------Beneficiaries are better off -------------------------------
+dchar <- function(grouping, varia) {
+  myaexp <- klip2 %>%
+    dplyr::select(grouping, varia)
+  
+  # myaexp <- subset(myaexp, myaexp[[varia]] !=c("No Response "))
+  # myaexp[[varia]] <- droplevels(myaexp[[varia]])
+  
+  myaexp <- subset(myaexp, myaexp[[varia]] != c("Do Not Know"))
+  myaexp[[varia]] <- droplevels(myaexp[[varia]])
+  
+  mdfr <- reshape::melt(myaexp, id.vars = grouping)
+  a <- data.frame(prop.table(table(mdfr[[grouping]], mdfr$value), 1) * 100)
+  
+  neg <- a %>%
+    filter(Var2 %in% levels(Var2)[1:3]) %>%
+    mutate(Freq = case_when(
+      Var2 == "Neutral" ~ Freq / 2,
+      TRUE ~ Freq
+    ))
+  
+  pos <- a %>%
+    filter(Var2 %in% levels(Var2)[3:5]) %>%
+    mutate(
+      Freq = case_when(
+        Var2 == "Neutral" ~ Freq / 2,
+        TRUE ~ Freq
+      ),
+      Var2 = factor(Var2, levels = rev(levels(Var2)))
+    )
+  
+  plot <- ggplot() +
+    geom_col(
+      data = pos,
+      aes(
+        x = Var1,
+        y = Freq,
+        fill = Var2
+      )
+    ) +
+    geom_col(
+      data = neg,
+      aes(
+        x = Var1,
+        y = -Freq,
+        fill = Var2
+      )
+    ) +
+    coord_flip() +
+    theme_fivethirtyeight() +
+    scale_fill_brewer(
+      name = "",
+      limits = levels(neg$Var2),
+      labels = levels(neg$Var2),
+      palette = "RdBu"
+    ) +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(
+        size = 14,
+        face = "bold"
+      )
+    ) +
+    ylim(-30, 100)
+}
+
+one <- dchar("County", "SECTION2HOUSEHOLDCHARACTERISTICS.Q211c") +
+  ggtitle("KLIP beneficiaries are much better off than those not registered in KLIP")
+
+ggsave("Plots/beneficiary_better.pdf", one, width = 9, height = 6)
+
+#---------Reason for animal loss --------------------
+dchar <- function(grouping, varia) {
+  myaexp <- klip %>%
+    dplyr::select(grouping, varia)
+  # myaexp <- subset(myaexp, myaexp[[varia]] !=c("No Response "))
+  # myaexp[[varia]] <- droplevels(myaexp[[varia]])
+  myaexp <- subset(myaexp, myaexp[[varia]] != c("Do Not Know"))
+  myaexp[[varia]] <- droplevels(myaexp[[varia]])
+  mdfr <- reshape::melt(myaexp, id.vars = grouping)
+  a <- data.frame(prop.table(table(mdfr[[grouping]], mdfr$value), 1) * 100)
+  neg <- a %>%
+    filter(Var2 %in% levels(Var2)[1:3]) %>%
+    mutate(Freq = case_when(
+      Var2 == "Neutral" ~ Freq / 2,
+      TRUE ~ Freq
+    ))
+  pos <- a %>%
+    filter(Var2 %in% levels(Var2)[3:5]) %>%
+    mutate(
+      Freq = case_when(
+        Var2 == "Neutral" ~ Freq / 2,
+        TRUE ~ Freq
+      ),
+      Var2 = factor(Var2, levels = rev(levels(Var2)))
+    )
+  plot <- ggplot() +
+    geom_col(data = pos, aes(
+      x = Var1,
+      y = Freq,
+      fill = Var2
+    )) +
+    geom_col(data = neg, aes(
+      x = Var1,
+      y = -Freq,
+      fill = Var2
+    )) +
+    coord_flip() +
+    theme_fivethirtyeight() +
+    scale_fill_brewer(name = "", limits = levels(neg$Var2), labels = levels(neg$Var2), palette = "RdBu") +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(
+        size = 11,
+        face = "bold"
+      )
+    ) +
+    ylim(-100, 20)
+}
+
+one <- dchar("treat", "SECTION2HOUSEHOLDCHARACTERISTICS.Q206a") + 
+  ggtitle("Have KLIP payouts affected the numbers of livestock traded at local market?") + 
+  theme(legend.position = "bottom")
+
+#------- Understand how KLIP works -----------------
+dchar <- function(grouping, varia) {
+  myaexp <- klip2 %>%
+    dplyr::select(grouping, varia)
+  
+  # myaexp <- subset(myaexp, myaexp[[varia]] !=c("No Response "))
+  # myaexp[[varia]] <- droplevels(myaexp[[varia]])
+  
+  myaexp <- subset(myaexp, myaexp[[varia]] != c("Do Not Know"))
+  myaexp[[varia]] <- droplevels(myaexp[[varia]])
+  
+  mdfr <- reshape::melt(myaexp, id.vars = grouping)
+  a <- data.frame(prop.table(table(mdfr[[grouping]], mdfr$value), 1) * 100)
+  
+  neg <- a %>%
+    filter(Var2 %in% levels(Var2)[1:3]) %>%
+    mutate(Freq = case_when(
+      Var2 == "Neutral" ~ Freq / 2,
+      TRUE ~ Freq
+    ))
+  
+  pos <- a %>%
+    filter(Var2 %in% levels(Var2)[3:5]) %>%
+    mutate(
+      Freq = case_when(
+        Var2 == "Neutral" ~ Freq / 2,
+        TRUE ~ Freq
+      ),
+      Var2 = factor(Var2, levels = rev(levels(Var2)))
+    )
+  
+  plot <- ggplot() +
+    geom_col(
+      data = pos,
+      aes(
+        x = Var1,
+        y = Freq,
+        fill = Var2
+      )
+    ) +
+    geom_col(
+      data = neg,
+      aes(
+        x = Var1,
+        y = -Freq,
+        fill = Var2
+      )
+    ) +
+    coord_flip() +
+    theme_fivethirtyeight() +
+    scale_fill_brewer(
+      name = "",
+      limits = levels(neg$Var2),
+      labels = levels(neg$Var2),
+      palette = "RdBu"
+    ) +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(
+        size = 14,
+        face = "bold"
+      )
+    ) +
+    ylim(-100, 100)
+}
+
+one <- dchar("County", "SECTION3Localmarketperception.Q303g") +
+  ggtitle("All pastoralists understand how KLIP works")
+
+two <- dchar("County", "SECTION3Localmarketperception.Q303h") +
+  ggtitle("Most pastoralists do not even know if they're registered for KLIP")
+
+three <- dchar("County", "SECTION3Localmarketperception.Q304j") +
+  ggtitle("I am aware of exactly when I will be recieving a KLIP payout")
+
+market <- grid.arrange(one, two, three, ncol = 1)
+
+ggsave("Plots/market.pdf", market, width = 12, height = 10)
+
+#------------ Insurance products -----------------
+# Gender difference heard of Klip before
+barch <- function(data, cat, ans) {
+  myaexp <- data %>%
+    dplyr::select(cat, ans)
+  
+  myaexp <- subset(myaexp, myaexp[[ans]] != c("No response"))
+  myaexp[[ans]] <- droplevels(myaexp[[ans]])
+  
+  # myaexp <- subset(myaexp, myaexp[[ans]] !=c("Do Not Know"))
+  # myaexp[[ans]] <- droplevels(myaexp[[ans]])
+  
+  mdfr <- reshape::melt(myaexp, id.vars = cat)
+  
+  a <- data.frame(prop.table(table(mdfr[[cat]], mdfr$value), 1) * 100)
+  
+  chplot <- ggplot( a, aes(x = Var1,
+                           y = Freq,
+                           fill = forcats::fct_rev(Var2)))  +
+    labs(x = "", y = "Pecentage") +
+    scale_fill_manual(values=c("#1372a4", "#e57137")) +
+    geom_bar(stat = "identity") +
+    theme_538() +
+    theme(
+      legend.position = "bottom",
+      plot.title = element_text(
+        size = 20,
+        family = "",
+        color = "Black",
+        face = "bold",
+        hjust = 0.5
+      ),
+      legend.text = element_text(size = 16),
+      axis.text = element_text(
+        size = 16,
+        family = "",
+        color = "Black",
+        hjust = 0
+      ),
+      axis.title = element_text(
+        size = 18,
+        family = "",
+        color = "Black",
+        face = "bold",
+        hjust = 0.5
+      )
+    ) +
+    coord_flip() +
+    guides(fill = guide_legend(reverse = TRUE))
+  chplot
+}
+
+dat <- klip %>%
+  filter(Section5.Q501b != "Don't know") %>%
+  mutate(Section5.Q501b = droplevels(Section5.Q501b))
+
+one <- barch( dat, "treat", "SECTION2HOUSEHOLDCHARACTERISTICS.Q201a") +
+  xlab("") +
+  ggtitle("Have you ever heard of KLIP?")  +
+  theme(legend.position = "none") 
+
+two <- barch( dat, "SECTION1.HouseHoldMembers.HHGender", "SECTION2HOUSEHOLDCHARACTERISTICS.Q201a") +
+  xlab("") +
+  ggtitle("Have you ever heard of KLIP?")  +
+  theme(legend.position = "none") 
+
+three <- barch( dat, "County", "SECTION2HOUSEHOLDCHARACTERISTICS.Q201a") +
+  xlab("") +
+  ggtitle("Have you ever heard of KLIP?") + 
+  theme(legend.title = element_blank())
+
+comb <- cowplot::plot_grid(one,two,three, ncol=1, align = "vh") 
+
+ggsave("Plots/comb_insu.pdf", comb, width = 10, height = 12)
+
+# Extra
+
+testone <- klip2 %>% select(SECTION3Localmarketperception.Q304) %>% mutate(one = "There were some registration criteria that I did not completely understand")
+testtwo <- klip2 %>% select(SECTION3Localmarketperception.Q304k) %>% mutate(one = "The registration process for KLIP should be improved")
+testthree <-klip2 %>% select(SECTION3Localmarketperception.Q304j) %>% mutate(one = "I am aware of exactly when I should receive a payout or not")
+
+colnames(testone) <- "one"
+colnames(testtwo) <- "one"
+colnames(testthree) <- "one"
+tt <- rbind(testone, testtwo, testthree)
+colnames(tt) <- c("one", "two")
+
+graphy2 <- dchar("two", "one") + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
+  ylim(-80, 90) + 
+  theme(axis.text.y = element_text(face = "bold", size = 12),
+        axis.text.x = element_text(size = 12),
+        legend.position = "bottom")
+
+ggsave("Plots/graphy2.pdf",  graphy2, width = 10, height = 4)
